@@ -13,27 +13,39 @@ function decodeUplink(input) {
   // Decode an uplink message from a buffer
   // (array) of bytes to an object of fields.
   var decoded = {};
-  decoded.latitude = ((input.bytes[0]<<16)>>>0) + ((input.bytes[1]<<8)>>>0) + input.bytes[2];
-  decoded.latitude = (decoded.latitude / 16777215.0 * 180) - 90;
 
-  decoded.longitude = ((input.bytes[3]<<16)>>>0) + ((input.bytes[4]<<8)>>>0) + input.bytes[5];
-  decoded.longitude = (decoded.longitude / 16777215.0 * 360) - 180;
-
-  var altValue = ((input.bytes[6]<<8)>>>0) + input.bytes[7];
-  var sign = input.bytes[6] & (1 << 7);
-  if(sign)
-  {
-    decoded.altitude = 0xFFFF0000 | altValue;
+  if (input.bytes[0]== 0xFF && input.bytes.length== 1) {
+    // If the first and only byte is 0xFF, then we have no GPS fix 
+    decoded.fix = false;
+    return {
+      data:decoded,
+    }
   }
   else
   {
-    decoded.altitude = altValue;
-  }
-
-  decoded.hdop = input.bytes[8] / 10.0;
-
-  return {
-    data:decoded,
+    decoded.fix = true;
+    decoded.latitude = ((input.bytes[0]<<16)>>>0) + ((input.bytes[1]<<8)>>>0) + input.bytes[2];
+    decoded.latitude = (decoded.latitude / 16777215.0 * 180) - 90;
+  
+    decoded.longitude = ((input.bytes[3]<<16)>>>0) + ((input.bytes[4]<<8)>>>0) + input.bytes[5];
+    decoded.longitude = (decoded.longitude / 16777215.0 * 360) - 180;
+  
+    var altValue = ((input.bytes[6]<<8)>>>0) + input.bytes[7];
+    var sign = input.bytes[6] & (1 << 7);
+    if(sign)
+    {
+      decoded.altitude = 0xFFFF0000 | altValue;
+    }
+    else
+    {
+      decoded.altitude = altValue;
+    }
+  
+    decoded.hdop = input.bytes[8] / 10.0;
+  
+    return {
+      data:decoded,
+    }
   }
 }
  *
@@ -62,8 +74,8 @@ uint16_t altitudeGps;
 uint8_t hdopGps;
 char c;
 
-int interval_sec = 300;
-int interval_meters = 100;
+int interval_sec = 60;
+int interval_meters = 20;
 
 void checkDownlink();
 void displayInfo();
@@ -168,8 +180,8 @@ void loop(void)
       last_lat,
       last_lng);
 
-  if ((gps.location.age() < 1000 ) && (((millis() - last_update) >= interval_sec * 1000) ||(distanceM >= interval_meters))) {
-    led_on();
+  if (((millis() - last_update) >= interval_sec * 1000) ||(distanceM >= interval_meters)) {
+  
     SerialUSB.print("Interval: ");
     SerialUSB.println(millis()-last_update);
     SerialUSB.print("Distance: ");
@@ -187,26 +199,12 @@ void loop(void)
       SerialUSB.println("Distance >5000M . Fix is probably wrong");
     }
 
-    led_off();
     last_update = millis();
     last_lat =gps.location.lat();
     last_lng =gps.location.lng();
     SerialUSB.println();
   }
 
-  if (millis() - last_update >= interval_sec * 1000) {
-    led_on();
-    SerialUSB.print("Interval: ");
-    SerialUSB.println(millis()-last_update);
-    SerialUSB.println("Envoi Dummy Packet: ");
-    lora.LinkCheckReq();
-    SerialUSB.println("TX done");
-    checkDownlink();
-    led_off();
-    last_update = millis();
-    SerialUSB.println();
-  }
- 
 }
 
 void checkDownlink()
@@ -315,23 +313,30 @@ void displayInfo()
 
 void build_packet()
 {
-  LatitudeBinary = ((gps.location.lat() + 90) / 180.0) * 16777215;
-  LongitudeBinary = ((gps.location.lng() + 180) / 360.0) * 16777215;
+  if ( gps.location.isValid() )
+  {
 
-  txBuffer[0] = ( LatitudeBinary >> 16 ) & 0xFF;
-  txBuffer[1] = ( LatitudeBinary >> 8 ) & 0xFF;
-  txBuffer[2] = LatitudeBinary & 0xFF;
+    LatitudeBinary = ((gps.location.lat() + 90) / 180.0) * 16777215;
+    LongitudeBinary = ((gps.location.lng() + 180) / 360.0) * 16777215;
 
-  txBuffer[3] = ( LongitudeBinary >> 16 ) & 0xFF;
-  txBuffer[4] = ( LongitudeBinary >> 8 ) & 0xFF;
-  txBuffer[5] = LongitudeBinary & 0xFF;
+    txBuffer[0] = ( LatitudeBinary >> 16 ) & 0xFF;
+    txBuffer[1] = ( LatitudeBinary >> 8 ) & 0xFF;
+    txBuffer[2] = LatitudeBinary & 0xFF;
 
-  altitudeGps = gps.altitude.meters();
-  txBuffer[6] = ( altitudeGps >> 8 ) & 0xFF;
-  txBuffer[7] = altitudeGps & 0xFF;
+    txBuffer[3] = ( LongitudeBinary >> 16 ) & 0xFF;
+    txBuffer[4] = ( LongitudeBinary >> 8 ) & 0xFF;
+    txBuffer[5] = LongitudeBinary & 0xFF;
 
-  hdopGps = gps.hdop.value()/10;
-  txBuffer[8] = hdopGps & 0xFF;
+    altitudeGps = gps.altitude.meters();
+    txBuffer[6] = ( altitudeGps >> 8 ) & 0xFF;
+    txBuffer[7] = altitudeGps & 0xFF;
+
+    hdopGps = gps.hdop.value()/10;
+    txBuffer[8] = hdopGps & 0xFF;
+  } else {
+    // 0xFF if no fix
+    txBuffer[0] = 0xFF;
+  }
 
   toLog = "";
   for(size_t i = 0; i<sizeof(txBuffer); i++)
