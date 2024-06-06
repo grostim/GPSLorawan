@@ -286,10 +286,12 @@ void build_packet()
     hdopGps = gps.hdop.value()/10;
     txBuffer[8] = hdopGps & 0xFF;
     sizePacket=9;
+    led_on();
   } else {
     // 0xFF if no fix
     txBuffer[0] = 0xFF;
     sizePacket=1;
+    led_off();
   }
 
   toLog = "";
