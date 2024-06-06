@@ -21,6 +21,7 @@ double last_lat;
 double last_lng;
 String toLog;
 uint8_t txBuffer[9];
+uint8_t sizePacket;
 uint32_t LatitudeBinary, LongitudeBinary;
 uint16_t altitudeGps;
 uint8_t hdopGps;
@@ -142,7 +143,7 @@ void loop(void)
     SerialUSB.println(toLog);
 
     if (distanceM <= 5000) {
-      lora.transferPacket(txBuffer, sizeof(txBuffer), 8);
+      lora.transferPacket(txBuffer, sizePacket, 8);
       SerialUSB.println("TX done");
       checkDownlink();
     }
@@ -284,13 +285,15 @@ void build_packet()
 
     hdopGps = gps.hdop.value()/10;
     txBuffer[8] = hdopGps & 0xFF;
+    sizePacket=9;
   } else {
     // 0xFF if no fix
     txBuffer[0] = 0xFF;
+    sizePacket=1;
   }
 
   toLog = "";
-  for(size_t i = 0; i<sizeof(txBuffer); i++)
+  for(size_t i = 0; i<sizePacket; i++)
   {
     char buffer[3];
     sprintf(buffer, "%02x", txBuffer[i]);
