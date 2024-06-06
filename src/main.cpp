@@ -3,11 +3,11 @@
 //  Based initially on the OTAA-LoRa-Seeed sketch, but I've
 //  pretty much gutted it.
 //
-//  Copywrite (c) 2017  Todd Krein.   All Rights Reserved.
+//  2024 Grostim.
 /**
  *
  * To decode the binary payload, you can use the following
- * javascript decoder function. It should work with the TTN console.
+ * javascript decoder function. It should work with the TTN console (V3).
  *
 function decodeUplink(input) {
   // Decode an uplink message from a buffer
@@ -48,18 +48,49 @@ function decodeUplink(input) {
     }
   }
 }
- *
- */
 
-#define USE_GPS 1
+function encodeDownlink(input) {
+  //Exemple of JSON Payload:
+  //{
+  //  "Cmd": "ConfigDistanceInterval",
+  //  "value": 300
+  //}
+  var ret = [];
+  var value;
+    if (input.data.Cmd == "ConfigTimeInterval")
+    {
+        value = input.data.value;
+        
+        ret[0] = 0x01
+        ret[1] = value >>8;
+        ret[2] = (value & 0xFF)
+    }
+    else if (input.data.Cmd == "ConfigDistanceInterval")
+    {
+        value = input.data.value;
+        
+        ret[0] = 0x02
+        ret[1] = value >>8;
+        ret[2] = (value & 0xFF);
+    }  
+    
+  
+  return {
+    bytes: ret,
+    fPort: 1,
+    warnings: [],
+    errors: []
+  };
+}
+ **/
+
+
 // #define DEBUG_GPS 1
 #include "Arduino.h"
 #include "LoRaWan.h"
 
-#ifdef USE_GPS
 #include "TinyGPS++.h"
 TinyGPSPlus gps;
-#endif
 
 unsigned char data[10] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 0xA,};
 char buffer[256];
@@ -96,7 +127,7 @@ void setup(void)
     lora.init();
     lora.setDeviceReset();
 
-#ifdef USE_GPS
+
     Serial.begin(9600);     // open Serial to the GPS
 
     // For S&G, let's get the GPS fix now, before we start running arbitary
@@ -128,7 +159,6 @@ void setup(void)
         break;
       }
     }
-#endif
     
     memset(buffer, 0, 256);
     lora.getVersion(buffer, 256, 1);
