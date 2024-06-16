@@ -100,7 +100,7 @@ void setup(void)
     lora.setDeciveMode(LWOTAA);
     lora.setClassType(CLASS_A);
     lora.setDataRate(DR0, EU868);
-    lora.setAdaptiveDataRate(true);
+    lora.setAdaptiveDataRate(false);
     lora.setChannel(0, 868.1);
     lora.setChannel(1, 868.3);
     lora.setChannel(2, 868.5);
@@ -111,7 +111,7 @@ void setup(void)
     lora.setDutyCycle(false);
     lora.setJoinDutyCycle(false);
     
-    lora.setPower(14);
+    lora.setPower(20);
     
     while(!lora.setOTAAJoin(JOIN));
 }
